@@ -58,9 +58,11 @@ public class MnistClassifierSaveModel {
         File testData = new File(DATA_PATH + "/mnist_png/testing");
 
         // Define the FileSplit
+
         FileSplit train = new FileSplit(trainData, NativeImageLoader.ALLOWED_FORMATS, randNumGen);
         FileSplit test = new FileSplit(testData, NativeImageLoader.ALLOWED_FORMATS, randNumGen);
-
+        System.out.println("Train Data Size: " + train.length());
+        System.out.println("Test Data Size: " + test.length());
         // Extract the parent path as the image label
         ParentPathLabelGenerator labelMaker = new ParentPathLabelGenerator();
 
@@ -80,8 +82,9 @@ public class MnistClassifierSaveModel {
         MultiLayerConfiguration conf = new NeuralNetConfiguration.Builder()
                 .seed(rngseed)
                 .optimizationAlgo(OptimizationAlgorithm.STOCHASTIC_GRADIENT_DESCENT)
-                .iterations(1)
-                .learningRate(0.01)
+                .iterations(20)
+                .learningRate(0.3)
+                // .regularization(true).l2(2)
                 .list()
                 .layer(0, new DenseLayer.Builder()
                         .nIn(height * width)
@@ -89,6 +92,21 @@ public class MnistClassifierSaveModel {
                         .activation(Activation.RELU)
                         .build())
                 .layer(1, new DenseLayer.Builder()
+                        .nIn(numHidden)
+                        .nOut(numHidden)
+                        .activation(Activation.RELU)
+                        .build())
+                .layer(1, new DenseLayer.Builder()
+                        .nIn(numHidden)
+                        .nOut(numHidden)
+                        .activation(Activation.RELU)
+                        .build())
+                .layer(2, new DenseLayer.Builder()
+                        .nIn(numHidden)
+                        .nOut(numHidden)
+                        .activation(Activation.RELU)
+                        .build())
+                .layer(2, new DenseLayer.Builder()
                         .nIn(numHidden)
                         .nOut(numHidden)
                         .activation(Activation.RELU)
@@ -107,30 +125,47 @@ public class MnistClassifierSaveModel {
         // The ScoreIterationListener
         // will log output to show how well the network is training
         model.setListeners(new ScoreIterationListener(100));
-
+        long startTime = System.nanoTime();
+        System.out.println("Train Model: ");
         log.info("TRAIN MODEL");
         for (int i = 0; i < numEpochs; i++) {
             log.info("EPOCH: " + (i+1));
             model.fit(dataIter);
         }
-
+        long endTime = System.nanoTime();
+        System.out.println("Running Time : " + (double)(endTime - startTime) / 1000000000.0);
         log.info("EVALUATE MODEL");
+        System.out.println("TRAINING ACCURACY");
         recordReader.reset();
-        recordReader.initialize(test);
+        recordReader.initialize(train);
         DataSetIterator testIter = new RecordReaderDataSetIterator(recordReader,
                 batchSize, 1, outputNum);
         scaler.fit(testIter);
         testIter.setPreProcessor(scaler);
-
         Evaluation eval = new Evaluation(outputNum);
         while (testIter.hasNext()) {
             DataSet next = testIter.next();
             INDArray output = model.output(next.getFeatureMatrix());
             eval.eval(next.getLabels(), output);
         }
-
+        System.out.println(eval.stats());
+        System.out.println("-----------------");
+        System.out.println("TEST ACCURACY");
+        recordReader.reset();
+        recordReader.initialize(test);
+        testIter = new RecordReaderDataSetIterator(recordReader,
+                batchSize, 1, outputNum);
+        scaler.fit(testIter);
+        testIter.setPreProcessor(scaler);
+        eval = new Evaluation(outputNum);
+        while (testIter.hasNext()) {
+            DataSet next = testIter.next();
+            INDArray output = model.output(next.getFeatureMatrix());
+            eval.eval(next.getLabels(), output);
+        }
+        System.out.println(eval.stats());
         log.info(eval.stats());
-
+        System.out.println("------------");
         log.info("SAVE TRAINED MODEL");
         // Where to save model
         File locationToSave = new File(DATA_PATH + "/trained_mnist_model.zip");

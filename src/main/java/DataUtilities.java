@@ -9,7 +9,7 @@ import org.apache.http.impl.client.HttpClientBuilder;
 
 import java.io.*;
 
-public class Utility {
+public class DataUtilities {
 
     /**
      * Download a remote file if it doesn't exist.
